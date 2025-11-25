@@ -70,6 +70,14 @@ AsyncWebServer server(80);
 #define TFT_BL_PIN 45
 #endif
 
+#ifndef TFT_BL_FREQ
+#define TFT_BL_FREQ 44100
+#endif
+
+#ifndef TFT_BL_PWM_CHANNEL
+#define TFT_BL_PWM_CHANNEL 7
+#endif
+
 #ifndef TOUCH_SDA_PIN
 #define TOUCH_SDA_PIN 38
 #endif
@@ -129,8 +137,8 @@ class LGFX : public lgfx::LGFX_Device {
       auto cfg = _light.config();
       cfg.pin_bl = TFT_BL_PIN;
       cfg.invert = false;
-      cfg.freq = 44100;
-      cfg.pwm_channel = 7;
+      cfg.freq = TFT_BL_FREQ;
+      cfg.pwm_channel = TFT_BL_PWM_CHANNEL;
       _light.config(cfg);
       _panel.setLight(&_light);
     }
