@@ -3,3 +3,6 @@ src/config.cpp
 
 # PlatformIO build artifacts
 .pio/
+
+# CodeQL artifacts
+_codeql*
