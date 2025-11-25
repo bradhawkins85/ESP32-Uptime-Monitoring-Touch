@@ -1,2 +1,5 @@
 # Local configuration source containing secrets
 src/config.cpp
+
+# PlatformIO build artifacts
+.pio/
