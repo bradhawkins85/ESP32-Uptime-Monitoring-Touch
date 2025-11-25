@@ -1,5 +1,8 @@
 # Local configuration source containing secrets
 src/config.cpp
 
-# PlatformIO build files
+# PlatformIO build artifacts
 .pio/
+
+# CodeQL artifacts
+_codeql*
