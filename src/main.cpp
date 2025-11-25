@@ -1001,16 +1001,30 @@ String getWebPage() {
             background: #4b5563;
         }
 
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
         .backup-actions {
             display: flex;
             gap: 10px;
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #e5e7eb;
+            align-items: center;
+            flex-wrap: wrap;
         }
 
         .backup-actions input[type="file"] {
             display: none;
+        }
+
+        .backup-actions .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 44px;
         }
 
         .services-grid {
@@ -1155,7 +1169,14 @@ String getWebPage() {
         <div id="alertContainer"></div>
 
         <div class="card">
-            <h2 style="margin-bottom: 20px; color: #1f2937;">Add New Service</h2>
+            <div class="card-header">
+                <h2 style="margin: 0; color: #1f2937;">Add New Service</h2>
+                <div class="backup-actions">
+                    <button type="button" class="btn btn-secondary" onclick="exportServices()">Export Monitors</button>
+                    <label class="btn btn-secondary" for="importFile">Import Monitors</label>
+                    <input type="file" id="importFile" accept=".json" onchange="importServices(this.files[0])">
+                </div>
+            </div>
             <form id="addServiceForm" class="add-service-form">
                 <div class="form-group">
                     <label for="serviceName">Service Name</label>
@@ -1202,12 +1223,6 @@ String getWebPage() {
                 </div>
 
                 <button type="submit" class="btn btn-primary">Add Service</button>
-
-                <div class="backup-actions">
-                    <button type="button" class="btn btn-secondary" onclick="exportServices()">Export Monitors</button>
-                    <label class="btn btn-secondary" for="importFile">Import Monitors</label>
-                    <input type="file" id="importFile" accept=".json" onchange="importServices(this.files[0])">
-                </div>
             </form>
         </div>
 
