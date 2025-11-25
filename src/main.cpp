@@ -152,7 +152,7 @@ void initFileSystem() {
   // If mount fails, explicitly format the filesystem first
   // This handles severely corrupted filesystems better than begin(true)
   if (!LittleFS.format()) {
-    Serial.println("LittleFS format failed!");
+    Serial.println("LittleFS format failed! Check partition table and flash configuration.");
     return;
   }
 
@@ -160,7 +160,7 @@ void initFileSystem() {
 
   // Now try to mount the freshly formatted filesystem
   if (!LittleFS.begin(false)) {
-    Serial.println("Failed to mount LittleFS after format");
+    Serial.println("Critical: Failed to mount LittleFS after successful format!");
     return;
   }
 
