@@ -1025,6 +1025,9 @@ String getWebPage() {
             align-items: center;
             justify-content: center;
             height: 44px;
+            padding: 0 18px;
+            line-height: 1;
+            box-sizing: border-box;
         }
 
         .services-grid {
