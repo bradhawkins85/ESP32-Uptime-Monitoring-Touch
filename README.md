@@ -17,6 +17,7 @@ It serves as a framework to monitor services where support can be hardcoded as a
 - Web-based UI for adding and managing services
 - Persistent storage using LittleFS
 - **Export/Import** monitor configurations for backup and restore
+- Optional **4.0\" capacitive touch dashboard** that cycles through monitored services with manual left/right tap navigation
 
 ## Prerequisites
 
@@ -163,6 +164,38 @@ Or combine build and upload in one command:
 ```bash
 pio run --target upload && pio device monitor
 ```
+
+## Using the 4.0" capacitive touch dashboard
+
+The firmware now includes a lightweight dashboard for common SPI-driven 4.0" TFT panels (e.g., ST7796) paired with an FT6206-compatible capacitive touch controller. The dashboard only **displays** the status of services already configured through the web UI; it does not add or delete services.
+
+- The screen automatically rotates between services every 8 seconds.
+- Tapping the **left** or **right** side of the screen manually switches to the previous/next service and resets the auto-rotation timer.
+- If no services exist, the display shows a reminder to configure them from the browser.
+
+### Pin and panel configuration
+
+Default pin mappings target a common ESP32-S3 dev board with a 4.0" SPI TFT:
+
+```
+SPI: SCLK=12, MOSI=11, MISO=NC, CS=10, DC=9, RST=14, BL=45
+Touch (I2C): SDA=38, SCL=39
+Panel size: 320x480 (landscape)
+```
+
+Override any pin or dimension at build time using `build_flags` in `platformio.ini`, for example:
+
+```ini
+build_flags =
+    -DTFT_SCLK_PIN=18
+    -DTFT_MOSI_PIN=23
+    -DTFT_DC_PIN=4
+    -DTOUCH_SDA_PIN=8
+    -DTFT_WIDTH=320
+    -DTFT_HEIGHT=480
+```
+
+Adjust the values to match your specific ESP32 and display wiring.
 
 ## Monitoring Serial Output
 

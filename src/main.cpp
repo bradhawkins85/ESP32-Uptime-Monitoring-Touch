@@ -8,6 +8,9 @@
 #include <HTTPClient.h>
 #include <ESP32Ping.h>
 #include <mbedtls/base64.h>
+#include <LovyanGFX.hpp>
+#include <Adafruit_FT6206.h>
+#include <Wire.h>
 
 #include "config.hpp"
 
@@ -29,6 +32,111 @@ void sendDiscordNotification(const String& title, const String& message);
 void sendSmtpNotification(const String& title, const String& message);
 
 AsyncWebServer server(80);
+
+// --- Display and touch configuration ---
+#ifndef TFT_WIDTH
+#define TFT_WIDTH 320
+#endif
+
+#ifndef TFT_HEIGHT
+#define TFT_HEIGHT 480
+#endif
+
+#ifndef TFT_SCLK_PIN
+#define TFT_SCLK_PIN 12
+#endif
+
+#ifndef TFT_MOSI_PIN
+#define TFT_MOSI_PIN 11
+#endif
+
+#ifndef TFT_MISO_PIN
+#define TFT_MISO_PIN -1
+#endif
+
+#ifndef TFT_CS_PIN
+#define TFT_CS_PIN 10
+#endif
+
+#ifndef TFT_DC_PIN
+#define TFT_DC_PIN 9
+#endif
+
+#ifndef TFT_RST_PIN
+#define TFT_RST_PIN 14
+#endif
+
+#ifndef TFT_BL_PIN
+#define TFT_BL_PIN 45
+#endif
+
+#ifndef TOUCH_SDA_PIN
+#define TOUCH_SDA_PIN 38
+#endif
+
+#ifndef TOUCH_SCL_PIN
+#define TOUCH_SCL_PIN 39
+#endif
+
+#ifndef TOUCH_INT_PIN
+#define TOUCH_INT_PIN -1
+#endif
+
+class LGFX : public lgfx::LGFX_Device {
+  lgfx::Panel_ST7796 _panel;
+  lgfx::Bus_SPI _bus;
+
+ public:
+  LGFX() {
+    {
+      auto cfg = _bus.config();
+      cfg.spi_host = SPI3_HOST;
+      cfg.spi_mode = 0;
+      cfg.freq_write = 60000000;
+      cfg.freq_read = 16000000;
+      cfg.pin_sclk = TFT_SCLK_PIN;
+      cfg.pin_mosi = TFT_MOSI_PIN;
+      cfg.pin_miso = TFT_MISO_PIN;
+      cfg.pin_dc = TFT_DC_PIN;
+      cfg.spi_3wire = TFT_MISO_PIN < 0;
+      _bus.config(cfg);
+      _panel.setBus(&_bus);
+    }
+
+    {
+      auto cfg = _panel.config();
+      cfg.pin_cs = TFT_CS_PIN;
+      cfg.pin_rst = TFT_RST_PIN;
+      cfg.pin_busy = -1;
+      cfg.pin_bl = TFT_BL_PIN;
+      cfg.bus_shared = true;
+      cfg.panel_width = TFT_WIDTH;
+      cfg.panel_height = TFT_HEIGHT;
+      cfg.offset_x = 0;
+      cfg.offset_y = 0;
+      cfg.memory_width = TFT_WIDTH;
+      cfg.memory_height = TFT_HEIGHT;
+      cfg.readable = false;
+      cfg.invert = false;
+      cfg.rgb_order = false;
+      cfg.dlen_16bit = false;
+      cfg.bus_shared = true;
+      _panel.config(cfg);
+      _panel.setRotation(1);
+    }
+
+    setPanel(&_panel);
+  }
+};
+
+LGFX display;
+Adafruit_FT6206 touchController;
+bool displayReady = false;
+bool touchReady = false;
+int currentServiceIndex = 0;
+bool displayNeedsUpdate = true;
+unsigned long lastDisplaySwitch = 0;
+const unsigned long DISPLAY_ROTATION_INTERVAL = 8000;
 
 // Service types
 // Right now the behavior for each is rudimentary
@@ -70,6 +178,7 @@ int serviceCount = 0;
 void initWiFi();
 void initWebServer();
 void initFileSystem();
+void initDisplay();
 void loadServices();
 void saveServices();
 String generateServiceId();
@@ -86,6 +195,8 @@ String getServiceTypeString(ServiceType type);
 String base64Encode(const String& input);
 bool readSmtpResponse(WiFiClient& client, int expectedCode);
 bool sendSmtpCommand(WiFiClient& client, const String& command, int expectedCode);
+void renderServiceOnDisplay();
+void handleDisplayLoop();
 
 void setup() {
   Serial.begin(115200);
@@ -105,6 +216,9 @@ void setup() {
   // Initialize web server
   initWebServer();
 
+  // Initialize display and touch controller (if connected)
+  initDisplay();
+
   Serial.println("System ready!");
   Serial.print("Access web interface at: http://");
   Serial.println(WiFi.localIP());
@@ -119,6 +233,8 @@ void loop() {
     checkServices();
     lastCheckTime = currentTime;
   }
+
+  handleDisplayLoop();
 
   delay(10);
 }
@@ -169,6 +285,35 @@ void initFileSystem() {
   }
 
   Serial.println("LittleFS mounted successfully after format");
+}
+
+void initDisplay() {
+  Serial.println("Initializing display...");
+  displayReady = display.init();
+  display.setRotation(1);
+  display.setTextSize(2);
+  display.setTextColor(TFT_WHITE, TFT_BLACK);
+
+  if (TFT_BL_PIN >= 0) {
+    display.setBrightness(200);
+  }
+
+  Wire.begin(TOUCH_SDA_PIN, TOUCH_SCL_PIN);
+  touchReady = touchController.begin();
+
+  if (touchReady) {
+    Serial.println("Touch controller ready");
+  } else {
+    Serial.println("Touch controller not detected");
+  }
+
+  if (displayReady) {
+    display.fillScreen(TFT_BLACK);
+    renderServiceOnDisplay();
+    lastDisplaySwitch = millis();
+  } else {
+    Serial.println("Display initialization failed");
+  }
 }
 
 void initWebServer() {
@@ -512,7 +657,118 @@ void checkServices() {
       } else if (!firstCheck) {
         sendOnlineNotification(services[i]);
       }
+
+      displayNeedsUpdate = true;
     }
+
+    if (i == currentServiceIndex) {
+      displayNeedsUpdate = true;
+    }
+  }
+}
+
+void renderServiceOnDisplay() {
+  if (!displayReady) return;
+
+  display.fillScreen(TFT_BLACK);
+
+  int16_t width = display.width();
+  int16_t height = display.height();
+
+  display.setTextColor(TFT_CYAN, TFT_BLACK);
+  display.setCursor(10, 10);
+  display.setTextSize(2);
+  display.println("ESP32 Monitor");
+
+  if (serviceCount == 0) {
+    display.setCursor(10, 60);
+    display.setTextColor(TFT_WHITE, TFT_BLACK);
+    display.println("No services configured.");
+    display.println("Add services via web UI.");
+    return;
+  }
+
+  if (currentServiceIndex >= serviceCount) {
+    currentServiceIndex = 0;
+  }
+
+  Service& svc = services[currentServiceIndex];
+  String status = svc.isUp ? "UP" : "DOWN";
+  uint16_t statusColor = svc.isUp ? TFT_GREEN : TFT_RED;
+
+  display.setTextSize(3);
+  display.setTextColor(TFT_WHITE, TFT_BLACK);
+  display.setCursor(10, 50);
+  display.printf("%s (%d/%d)", svc.name.c_str(), currentServiceIndex + 1, serviceCount);
+
+  display.fillRoundRect(10, 90, width - 20, 60, 12, TFT_NAVY);
+  display.setTextSize(2);
+  display.setCursor(20, 110);
+  display.setTextColor(statusColor, TFT_NAVY);
+  display.printf("Status: %s", status.c_str());
+
+  display.setCursor(20, 150);
+  display.setTextColor(TFT_YELLOW, TFT_BLACK);
+  display.printf("Type: %s", getServiceTypeString(svc.type).c_str());
+
+  display.setCursor(20, 180);
+  display.setTextColor(TFT_WHITE, TFT_BLACK);
+  display.printf("Host: %s:%d", svc.host.c_str(), svc.port);
+
+  unsigned long sinceCheck = svc.lastCheck > 0 ? (millis() - svc.lastCheck) / 1000 : 0;
+  display.setCursor(20, 210);
+  if (svc.lastCheck == 0) {
+    display.println("Last check: pending");
+  } else {
+    display.printf("Last check: %lus ago", sinceCheck);
+  }
+
+  if (svc.lastError.length() > 0) {
+    display.setCursor(20, 240);
+    display.setTextColor(TFT_RED, TFT_BLACK);
+    display.printf("Error: %s", svc.lastError.c_str());
+  }
+
+  display.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  display.setCursor(10, height - 60);
+  display.println("Tap left/right to switch");
+  display.setCursor(10, height - 30);
+  display.printf("Auto-rotate every %lus", DISPLAY_ROTATION_INTERVAL / 1000);
+}
+
+void handleDisplayLoop() {
+  if (!displayReady) return;
+
+  unsigned long now = millis();
+
+  if (serviceCount > 0 && now - lastDisplaySwitch >= DISPLAY_ROTATION_INTERVAL) {
+    currentServiceIndex = (currentServiceIndex + 1) % serviceCount;
+    displayNeedsUpdate = true;
+    lastDisplaySwitch = now;
+  }
+
+  if (touchReady && serviceCount > 0 && touchController.touched()) {
+    TS_Point p = touchController.getPoint();
+    int16_t x = map(p.y, 0, TFT_WIDTH, 0, display.width());
+    int16_t y = map(p.x, 0, TFT_HEIGHT, 0, display.height());
+
+    if (y > 20) {
+      if (x < display.width() / 2) {
+        currentServiceIndex = (currentServiceIndex - 1 + serviceCount) % serviceCount;
+      } else {
+        currentServiceIndex = (currentServiceIndex + 1) % serviceCount;
+      }
+      displayNeedsUpdate = true;
+      lastDisplaySwitch = now;
+      while (touchController.touched()) {
+        delay(50);
+      }
+    }
+  }
+
+  if (displayNeedsUpdate) {
+    renderServiceOnDisplay();
+    displayNeedsUpdate = false;
   }
 }
 
