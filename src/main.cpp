@@ -55,7 +55,6 @@ struct Service {
   int consecutivePasses;  // Current count of consecutive passes
   int consecutiveFails;   // Current count of consecutive fails
   bool isUp;
-  bool notified;          // Whether we've sent a notification for current state
   unsigned long lastCheck;
   unsigned long lastUptime;
   String lastError;
@@ -254,12 +253,18 @@ void initWebServer() {
       newService.path = doc["path"] | "/";
       newService.expectedResponse = doc["expectedResponse"] | "*";
       newService.checkInterval = doc["checkInterval"] | 60;
-      newService.passThreshold = doc["passThreshold"] | 1;
-      newService.failThreshold = doc["failThreshold"] | 1;
+
+      int passThreshold = doc["passThreshold"] | 1;
+      if (passThreshold < 1) passThreshold = 1;
+      newService.passThreshold = passThreshold;
+
+      int failThreshold = doc["failThreshold"] | 1;
+      if (failThreshold < 1) failThreshold = 1;
+      newService.failThreshold = failThreshold;
+
       newService.consecutivePasses = 0;
       newService.consecutiveFails = 0;
       newService.isUp = false;
-      newService.notified = false;
       newService.lastCheck = 0;
       newService.lastUptime = 0;
       newService.lastError = "";
@@ -414,7 +419,6 @@ void initWebServer() {
         newService.consecutivePasses = 0;
         newService.consecutiveFails = 0;
         newService.isUp = false;
-        newService.notified = false;
         newService.lastCheck = 0;
         newService.lastUptime = 0;
         newService.lastError = "";
@@ -500,15 +504,13 @@ void checkServices() {
       Serial.printf("Service '%s' is now %s (after %d consecutive %s)\n",
         services[i].name.c_str(),
         services[i].isUp ? "UP" : "DOWN",
-        services[i].isUp ? services[i].passThreshold : services[i].failThreshold,
+        services[i].isUp ? services[i].consecutivePasses : services[i].consecutiveFails,
         services[i].isUp ? "passes" : "fails");
 
       if (!services[i].isUp) {
         sendOfflineNotification(services[i]);
-        services[i].notified = true;
       } else if (!firstCheck) {
         sendOnlineNotification(services[i]);
-        services[i].notified = true;
       }
     }
   }
@@ -906,7 +908,6 @@ void loadServices() {
     services[serviceCount].consecutivePasses = 0;
     services[serviceCount].consecutiveFails = 0;
     services[serviceCount].isUp = false;
-    services[serviceCount].notified = false;
     services[serviceCount].lastCheck = 0;
     services[serviceCount].lastUptime = 0;
     services[serviceCount].lastError = "";
