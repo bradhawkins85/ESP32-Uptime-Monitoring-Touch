@@ -155,19 +155,20 @@ class LGFX : public lgfx::LGFX_Device {
       cfg.pin_hsync   = GPIO_NUM_16;  // HSYNC -> IO16
       cfg.pin_pclk    = GPIO_NUM_21;  // PCLK  -> IO21
 
-      cfg.freq_write = 14000000; // 14MHz for RGB bus
+      cfg.freq_write = 14000000; // 14MHz for RGB bus (typical for ST7701 displays)
 
-      // Timing parameters for ST7701
-      cfg.hsync_polarity    = 0;
-      cfg.hsync_front_porch = 10;
-      cfg.hsync_pulse_width = 8;
-      cfg.hsync_back_porch  = 50;
-      cfg.vsync_polarity    = 0;
-      cfg.vsync_front_porch = 10;
-      cfg.vsync_pulse_width = 8;
-      cfg.vsync_back_porch  = 20;
-      cfg.pclk_idle_high    = 0;
-      cfg.de_idle_high      = 1;
+      // Timing parameters for ST7701 display
+      // These values are typical for 480x480 ST7701 panels
+      cfg.hsync_polarity    = 0;  // Active low
+      cfg.hsync_front_porch = 10; // Pixels before HSYNC
+      cfg.hsync_pulse_width = 8;  // HSYNC pulse width in pixels
+      cfg.hsync_back_porch  = 50; // Pixels after HSYNC
+      cfg.vsync_polarity    = 0;  // Active low
+      cfg.vsync_front_porch = 10; // Lines before VSYNC
+      cfg.vsync_pulse_width = 8;  // VSYNC pulse width in lines
+      cfg.vsync_back_porch  = 20; // Lines after VSYNC
+      cfg.pclk_idle_high    = 0;  // Pixel clock idle low
+      cfg.de_idle_high      = 1;  // Data enable idle high
 
       _bus_instance.config(cfg);
     }
