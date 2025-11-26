@@ -70,6 +70,14 @@ AsyncWebServer server(80);
 #define TFT_BL_PIN 45
 #endif
 
+#ifndef TFT_BL_FREQ
+#define TFT_BL_FREQ 44100
+#endif
+
+#ifndef TFT_BL_PWM_CHANNEL
+#define TFT_BL_PWM_CHANNEL 7
+#endif
+
 #ifndef TOUCH_SDA_PIN
 #define TOUCH_SDA_PIN 38
 #endif
@@ -85,6 +93,7 @@ AsyncWebServer server(80);
 class LGFX : public lgfx::LGFX_Device {
   lgfx::Panel_ST7796 _panel;
   lgfx::Bus_SPI _bus;
+  lgfx::Light_PWM _light;
 
  public:
   LGFX() {
@@ -108,7 +117,6 @@ class LGFX : public lgfx::LGFX_Device {
       cfg.pin_cs = TFT_CS_PIN;
       cfg.pin_rst = TFT_RST_PIN;
       cfg.pin_busy = -1;
-      cfg.pin_bl = TFT_BL_PIN;
       cfg.bus_shared = true;
       cfg.panel_width = TFT_WIDTH;
       cfg.panel_height = TFT_HEIGHT;
@@ -123,6 +131,16 @@ class LGFX : public lgfx::LGFX_Device {
       cfg.bus_shared = true;
       _panel.config(cfg);
       _panel.setRotation(1);
+    }
+
+    {
+      auto cfg = _light.config();
+      cfg.pin_bl = TFT_BL_PIN;
+      cfg.invert = false;
+      cfg.freq = TFT_BL_FREQ;
+      cfg.pwm_channel = TFT_BL_PWM_CHANNEL;
+      _light.config(cfg);
+      _panel.setLight(&_light);
     }
 
     setPanel(&_panel);
