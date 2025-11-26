@@ -61,7 +61,16 @@
 #endif
 
 #ifndef TOUCH_INT_PIN
-#define TOUCH_INT_PIN -1
+#define TOUCH_INT_PIN 40  // Touch interrupt pin for ESP32-4848S040
+#endif
+
+#ifndef TOUCH_RST_PIN
+// Touch reset pin for ESP32-4848S040 - Hardware design note:
+// GPIO 38 is shared between touch reset and backlight control on this board.
+// The GT911 touch controller requires a reset pulse during initialization,
+// after which the pin is reconfigured for PWM backlight control by LovyanGFX.
+// This is a hardware quirk of the Guition ESP32-4848S040 board design.
+#define TOUCH_RST_PIN 38
 #endif
 
 bool isNtfyConfigured() {
@@ -147,20 +156,20 @@ class LGFX : public lgfx::LGFX_Device {
       cfg.pin_hsync   = GPIO_NUM_16;  // HSYNC -> IO16
       cfg.pin_pclk    = GPIO_NUM_21;  // PCLK  -> IO21
 
-      cfg.freq_write = 14000000; // 14MHz for RGB bus (typical for ST7701 displays)
+      cfg.freq_write = 16000000; // 16MHz for RGB bus (matches ESPHome reference config)
 
-      // Timing parameters for ST7701 display
-      // These values are typical for 480x480 ST7701 panels
-      cfg.hsync_polarity    = 0;  // Active low
-      cfg.hsync_front_porch = 10; // Pixels before HSYNC
-      cfg.hsync_pulse_width = 8;  // HSYNC pulse width in pixels
-      cfg.hsync_back_porch  = 50; // Pixels after HSYNC
-      cfg.vsync_polarity    = 0;  // Active low
-      cfg.vsync_front_porch = 10; // Lines before VSYNC
-      cfg.vsync_pulse_width = 8;  // VSYNC pulse width in lines
-      cfg.vsync_back_porch  = 20; // Lines after VSYNC
+      // Timing parameters for ST7701 display on ESP32-4848S040
+      // Values from ESPHome reference configuration
+      cfg.hsync_polarity    = 0;  // Active low (hsync_idle_low: true)
+      cfg.hsync_front_porch = 8;  // hsync_front_porch
+      cfg.hsync_pulse_width = 4;  // hsync_pulse_width  
+      cfg.hsync_back_porch  = 8;  // hsync_back_porch
+      cfg.vsync_polarity    = 0;  // Active low (vsync_idle_low: true)
+      cfg.vsync_front_porch = 8;  // vsync_front_porch
+      cfg.vsync_pulse_width = 4;  // vsync_pulse_width
+      cfg.vsync_back_porch  = 8;  // vsync_back_porch
       cfg.pclk_idle_high    = 0;  // Pixel clock idle low
-      cfg.de_idle_high      = 1;  // Data enable idle high
+      cfg.de_idle_high      = 0;  // Data enable idle low (de_idle_high: false)
 
       _bus_instance.config(cfg);
     }
@@ -182,6 +191,7 @@ class LGFX : public lgfx::LGFX_Device {
       cfg.y_min = 0;
       cfg.y_max = TFT_HEIGHT - 1;
       cfg.pin_int = TOUCH_INT_PIN;
+      cfg.pin_rst = TOUCH_RST_PIN;  // Touch reset pin (shared with backlight on ESP32-4848S040)
       cfg.bus_shared = false;
       cfg.offset_rotation = 0;
       // I2C configuration for GT911
@@ -359,8 +369,23 @@ void initFileSystem() {
 
 void initDisplay() {
   Serial.println("Initializing display...");
+  
+  // Reset the GT911 touch controller before display initialization.
+  // Hardware note: On ESP32-4848S040, GPIO 38 is shared between touch reset and backlight.
+  // This reset sequence is required for proper GT911 I2C communication.
+  // The blocking delays here (60ms total) are acceptable during startup initialization
+  // and match the GT911 datasheet timing requirements.
+  if (TOUCH_RST_PIN >= 0) {
+    pinMode(TOUCH_RST_PIN, OUTPUT);
+    digitalWrite(TOUCH_RST_PIN, LOW);
+    delay(10);  // GT911 requires minimum 10ms reset pulse
+    digitalWrite(TOUCH_RST_PIN, HIGH);
+    delay(50);  // Wait for GT911 to complete internal initialization
+    Serial.println("GT911 touch controller reset complete");
+  }
+  
   displayReady = display.init();
-  display.setRotation(1);
+  display.setRotation(0);  // Rotation 0 for ESP32-4848S040 square display
   display.setTextSize(2);
   display.setTextColor(TFT_WHITE, TFT_BLACK);
 
