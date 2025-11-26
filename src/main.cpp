@@ -774,7 +774,12 @@ void renderServiceOnDisplay() {
   display.setTextColor(TFT_CYAN, TFT_BLACK);
   display.setCursor(10, 10);
   display.setTextSize(2);
-  display.println("ESP32 Monitor");
+  if (WiFi.status() == WL_CONNECTED) {
+    String header = "ESP32 Monitor - " + WiFi.localIP().toString();
+    display.println(header);
+  } else {
+    display.println("ESP32 Monitor - No WiFi");
+  }
 
   if (serviceCount == 0) {
     display.setCursor(10, 60);
