@@ -45,7 +45,7 @@
 #endif
 
 #ifndef TFT_RST_PIN
-#define TFT_RST_PIN 14
+#define TFT_RST_PIN -1  // No hardware reset pin - ESP32-4848S040 uses software reset via SPI init commands
 #endif
 
 #ifndef TFT_BL_PIN
