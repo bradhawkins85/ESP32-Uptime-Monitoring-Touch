@@ -12,8 +12,6 @@
 #include <LovyanGFX.hpp>
 #include <lgfx/v1/platforms/esp32s3/Panel_RGB.hpp>
 #include <lgfx/v1/platforms/esp32s3/Bus_RGB.hpp>
-#include <Adafruit_FT6206.h>
-#include <Wire.h>
 
 #include "config.hpp"
 
@@ -102,6 +100,7 @@ class LGFX : public lgfx::LGFX_Device {
   lgfx::Bus_RGB _bus_instance;
   lgfx::Panel_ST7701 _panel_instance;
   lgfx::Light_PWM _light_instance;
+  lgfx::Touch_GT911 _touch_instance;
 
  public:
   LGFX() {
@@ -185,6 +184,26 @@ class LGFX : public lgfx::LGFX_Device {
       _panel_instance.setLight(&_light_instance);
     }
 
+    // GT911 Touch controller configuration
+    {
+      auto cfg = _touch_instance.config();
+      cfg.x_min = 0;
+      cfg.x_max = TFT_WIDTH - 1;
+      cfg.y_min = 0;
+      cfg.y_max = TFT_HEIGHT - 1;
+      cfg.pin_int = TOUCH_INT_PIN;
+      cfg.bus_shared = false;
+      cfg.offset_rotation = 0;
+      // I2C configuration for GT911
+      cfg.i2c_port = 1;
+      cfg.i2c_addr = 0x5D;  // GT911 default address (can also be 0x14)
+      cfg.pin_sda = TOUCH_SDA_PIN;
+      cfg.pin_scl = TOUCH_SCL_PIN;
+      cfg.freq = 400000;
+      _touch_instance.config(cfg);
+      _panel_instance.setTouch(&_touch_instance);
+    }
+
     setPanel(&_panel_instance);
   }
 };
@@ -192,7 +211,6 @@ class LGFX : public lgfx::LGFX_Device {
 
 
 LGFX display;
-Adafruit_FT6206 touchController;
 bool displayReady = false;
 bool touchReady = false;
 int currentServiceIndex = 0;
@@ -360,11 +378,12 @@ void initDisplay() {
     display.setBrightness(200);
   }
 
-  Wire.begin(TOUCH_SDA_PIN, TOUCH_SCL_PIN);
-  touchReady = touchController.begin();
+  // Touch controller is now initialized as part of the LGFX class (GT911)
+  // Check if touch is available through the display panel
+  touchReady = display.touch() != nullptr;
 
   if (touchReady) {
-    Serial.println("Touch controller ready");
+    Serial.println("Touch controller (GT911) ready");
   } else {
     Serial.println("Touch controller not detected");
   }
@@ -809,21 +828,27 @@ void handleDisplayLoop() {
     lastDisplaySwitch = now;
   }
 
-  if (touchReady && serviceCount > 0 && touchController.touched()) {
-    TS_Point p = touchController.getPoint();
-    int16_t x = map(p.y, 0, TFT_WIDTH, 0, display.width());
-    int16_t y = map(p.x, 0, TFT_HEIGHT, 0, display.height());
+  // Use LovyanGFX's touch API (GT911)
+  if (touchReady && serviceCount > 0) {
+    lgfx::touch_point_t tp;
+    int touchCount = display.getTouch(&tp, 1);
+    
+    if (touchCount > 0) {
+      int16_t x = tp.x;
+      int16_t y = tp.y;
 
-    if (y > 20) {
-      if (x < display.width() / 2) {
-        currentServiceIndex = (currentServiceIndex - 1 + serviceCount) % serviceCount;
-      } else {
-        currentServiceIndex = (currentServiceIndex + 1) % serviceCount;
-      }
-      displayNeedsUpdate = true;
-      lastDisplaySwitch = now;
-      while (touchController.touched()) {
-        delay(50);
+      if (y > 20) {
+        if (x < display.width() / 2) {
+          currentServiceIndex = (currentServiceIndex - 1 + serviceCount) % serviceCount;
+        } else {
+          currentServiceIndex = (currentServiceIndex + 1) % serviceCount;
+        }
+        displayNeedsUpdate = true;
+        lastDisplaySwitch = now;
+        // Wait for touch release
+        while (display.getTouch(&tp, 1) > 0) {
+          delay(50);
+        }
       }
     }
   }

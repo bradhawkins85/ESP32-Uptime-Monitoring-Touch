@@ -167,7 +167,7 @@ pio run --target upload && pio device monitor
 
 ## Using the 4.0" capacitive touch dashboard
 
-The firmware now includes a lightweight dashboard for common SPI-driven 4.0" TFT panels (e.g., ST7796) paired with an FT6206-compatible capacitive touch controller. The dashboard only **displays** the status of services already configured through the web UI; it does not add or delete services.
+The firmware now includes a lightweight dashboard for common RGB-driven 4.0" TFT panels (e.g., ST7701) paired with a GT911 capacitive touch controller. The dashboard only **displays** the status of services already configured through the web UI; it does not add or delete services.
 
 - The screen automatically rotates between services every 8 seconds.
 - Tapping the **left** or **right** side of the screen manually switches to the previous/next service and resets the auto-rotation timer.
@@ -175,14 +175,14 @@ The firmware now includes a lightweight dashboard for common SPI-driven 4.0" TFT
 
 ### Pin and panel configuration
 
-Default pin mappings target the ESP32-4848S040 (Guition) board with 4.0" 480x480 RGB TFT (ST7701):
+Default pin mappings target the ESP32-4848S040 (Guition) board with 4.0" 480x480 RGB TFT (ST7701) and GT911 touch controller:
 
 ```
 RGB Bus: D0-D15=GPIO4,5,6,7,15,8,20,3,46,9,10,11,12,13,14,0
 Control: DE=18, VSYNC=17, HSYNC=16, PCLK=21
 SPI Init: SCLK=12, MOSI=11, CS=39
 Backlight: GPIO2
-Touch (I2C): SDA=19, SCL=45
+Touch (I2C GT911): SDA=19, SCL=45
 Panel size: 480x480
 ```
 
