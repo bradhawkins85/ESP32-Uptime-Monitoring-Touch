@@ -51,7 +51,7 @@
 #endif
 
 #ifndef TFT_BL_PIN
-#define TFT_BL_PIN 38   // BL_C per pinout (IO38)
+#define TFT_BL_PIN 2    // Backlight control pin for ESP32-4848S040
 #endif
 
 #ifndef TFT_BL_FREQ
@@ -63,11 +63,11 @@
 #endif
 
 #ifndef TOUCH_SDA_PIN
-#define TOUCH_SDA_PIN 38
+#define TOUCH_SDA_PIN 19  // Touch I2C SDA for ESP32-4848S040
 #endif
 
 #ifndef TOUCH_SCL_PIN
-#define TOUCH_SCL_PIN 39
+#define TOUCH_SCL_PIN 45  // Touch I2C SCL for ESP32-4848S040
 #endif
 
 #ifndef TOUCH_INT_PIN

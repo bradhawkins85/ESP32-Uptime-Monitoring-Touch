@@ -175,12 +175,15 @@ The firmware now includes a lightweight dashboard for common SPI-driven 4.0" TFT
 
 ### Pin and panel configuration
 
-Default pin mappings target a common ESP32-S3 dev board with a 4.0" SPI TFT:
+Default pin mappings target the ESP32-4848S040 (Guition) board with 4.0" 480x480 RGB TFT (ST7701):
 
 ```
-SPI: SCLK=12, MOSI=11, MISO=NC, CS=10, DC=9, RST=14, BL=45
-Touch (I2C): SDA=38, SCL=39
-Panel size: 320x480 (landscape)
+RGB Bus: D0-D15=GPIO4,5,6,7,15,8,20,3,46,9,10,11,12,13,14,0
+Control: DE=18, VSYNC=17, HSYNC=16, PCLK=21
+SPI Init: SCLK=12, MOSI=11, CS=39
+Backlight: GPIO2
+Touch (I2C): SDA=19, SCL=45
+Panel size: 480x480
 ```
 
 Override any pin or dimension at build time using `build_flags` in `platformio.ini`, for example:
@@ -189,9 +192,10 @@ Override any pin or dimension at build time using `build_flags` in `platformio.i
 build_flags =
     -DTFT_SCLK_PIN=18
     -DTFT_MOSI_PIN=23
-    -DTFT_DC_PIN=4
-    -DTOUCH_SDA_PIN=8
-    -DTFT_WIDTH=320
+    -DTFT_BL_PIN=2
+    -DTOUCH_SDA_PIN=19
+    -DTOUCH_SCL_PIN=45
+    -DTFT_WIDTH=480
     -DTFT_HEIGHT=480
 ```
 
