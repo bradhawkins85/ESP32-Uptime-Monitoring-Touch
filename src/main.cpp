@@ -105,6 +105,7 @@ class LGFX : public lgfx::LGFX_Device {
       cfg.panel_height  = TFT_HEIGHT;
       cfg.offset_x = 0;
       cfg.offset_y = 0;
+      cfg.pin_rst = TFT_RST_PIN;
       _panel_instance.config(cfg);
     }
 
