@@ -775,7 +775,8 @@ void renderServiceOnDisplay() {
   display.setCursor(10, 10);
   display.setTextSize(2);
   if (WiFi.status() == WL_CONNECTED) {
-    display.printf("ESP32 Monitor - %s", WiFi.localIP().toString().c_str());
+    String header = "ESP32 Monitor - " + WiFi.localIP().toString();
+    display.println(header);
   } else {
     display.println("ESP32 Monitor - No WiFi");
   }
