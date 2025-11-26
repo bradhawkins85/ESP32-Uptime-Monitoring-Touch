@@ -65,7 +65,12 @@
 #endif
 
 #ifndef TOUCH_RST_PIN
-#define TOUCH_RST_PIN 38  // Touch reset pin for ESP32-4848S040 (shared with backlight)
+// Touch reset pin for ESP32-4848S040 - Hardware design note:
+// GPIO 38 is shared between touch reset and backlight control on this board.
+// The GT911 touch controller requires a reset pulse during initialization,
+// after which the pin is reconfigured for PWM backlight control by LovyanGFX.
+// This is a hardware quirk of the Guition ESP32-4848S040 board design.
+#define TOUCH_RST_PIN 38
 #endif
 
 bool isNtfyConfigured() {
@@ -365,15 +370,17 @@ void initFileSystem() {
 void initDisplay() {
   Serial.println("Initializing display...");
   
-  // Reset the GT911 touch controller before display initialization
-  // On ESP32-4848S040, the touch reset pin (GPIO 38) is shared with backlight
-  // The GT911 needs a proper reset sequence to initialize correctly
+  // Reset the GT911 touch controller before display initialization.
+  // Hardware note: On ESP32-4848S040, GPIO 38 is shared between touch reset and backlight.
+  // This reset sequence is required for proper GT911 I2C communication.
+  // The blocking delays here (60ms total) are acceptable during startup initialization
+  // and match the GT911 datasheet timing requirements.
   if (TOUCH_RST_PIN >= 0) {
     pinMode(TOUCH_RST_PIN, OUTPUT);
     digitalWrite(TOUCH_RST_PIN, LOW);
-    delay(10);
+    delay(10);  // GT911 requires minimum 10ms reset pulse
     digitalWrite(TOUCH_RST_PIN, HIGH);
-    delay(50);
+    delay(50);  // Wait for GT911 to complete internal initialization
     Serial.println("GT911 touch controller reset complete");
   }
   
