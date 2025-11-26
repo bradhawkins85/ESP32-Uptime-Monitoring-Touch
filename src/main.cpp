@@ -14,28 +14,9 @@
 
 #include "config.hpp"
 
-bool isNtfyConfigured() {
-  return strlen(NTFY_TOPIC) > 0;
-}
-
-bool isDiscordConfigured() {
-  return strlen(DISCORD_WEBHOOK_URL) > 0;
-}
-
-bool isSmtpConfigured() {
-  return strlen(SMTP_SERVER) > 0 && strlen(SMTP_FROM_ADDRESS) > 0 &&
-         strlen(SMTP_TO_ADDRESS) > 0;
-}
-
-void sendNtfyNotification(const String& title, const String& message, const String& tags = "warning,monitor");
-void sendDiscordNotification(const String& title, const String& message);
-void sendSmtpNotification(const String& title, const String& message);
-
-AsyncWebServer server(80);
-
 // --- Display and touch configuration ---
 #ifndef TFT_WIDTH
-#define TFT_WIDTH 320
+#define TFT_WIDTH 480   // changed from 320 to 480
 #endif
 
 #ifndef TFT_HEIGHT
@@ -55,7 +36,7 @@ AsyncWebServer server(80);
 #endif
 
 #ifndef TFT_CS_PIN
-#define TFT_CS_PIN 10
+#define TFT_CS_PIN 39   // LCD_CS per pinout (IO39)
 #endif
 
 #ifndef TFT_DC_PIN
@@ -67,7 +48,7 @@ AsyncWebServer server(80);
 #endif
 
 #ifndef TFT_BL_PIN
-#define TFT_BL_PIN 45
+#define TFT_BL_PIN 38   // BL_C per pinout (IO38)
 #endif
 
 #ifndef TFT_BL_FREQ
@@ -90,62 +71,103 @@ AsyncWebServer server(80);
 #define TOUCH_INT_PIN -1
 #endif
 
+bool isNtfyConfigured() {
+  return strlen(NTFY_TOPIC) > 0;
+}
+
+bool isDiscordConfigured() {
+  return strlen(DISCORD_WEBHOOK_URL) > 0;
+}
+
+bool isSmtpConfigured() {
+  return strlen(SMTP_SERVER) > 0 && strlen(SMTP_FROM_ADDRESS) > 0 &&
+         strlen(SMTP_TO_ADDRESS) > 0;
+}
+
+void sendNtfyNotification(const String& title, const String& message, const String& tags = "warning,monitor");
+void sendDiscordNotification(const String& title, const String& message);
+void sendSmtpNotification(const String& title, const String& message);
+
+AsyncWebServer server(80);
+
+
+
+// LGFX device configured for ST7701 parallel RGB (16-bit) using pin mapping from your image.
+// NOTE: This is a best-effort mapping. If your DB numbering is offset (DB0 vs DB1), adjust
+// the d0..d15 pins below by +/-1 accordingly.
 class LGFX : public lgfx::LGFX_Device {
-  lgfx::Panel_ST7796 _panel;
-  lgfx::Bus_SPI _bus;
+  lgfx::Panel_ST7701 _panel;        // ST7701 panel
+  lgfx::Bus_Parallel16 _bus;        // 16-bit parallel bus
   lgfx::Light_PWM _light;
 
  public:
   LGFX() {
+    // Parallel bus configuration
     {
       auto cfg = _bus.config();
-      cfg.spi_host = SPI3_HOST;
-      cfg.spi_mode = 0;
-      cfg.freq_write = 60000000;
+      // Data pins d0..d15 mapped from the table you supplied (DB1..DB17).
+      // If the module uses DB0..DB15 instead, shift the mapping by one.
+      cfg.pin_d0 = 4;    // DB1(B)  -> IO4
+      cfg.pin_d1 = 5;    // DB2(B)  -> IO5
+      cfg.pin_d2 = 6;    // DB3(B)  -> IO6
+      cfg.pin_d3 = 7;    // DB4(B)  -> IO7
+      cfg.pin_d4 = 15;   // DB5(B)  -> IO15
+      cfg.pin_d5 = 8;    // DB6(G)  -> IO8
+      cfg.pin_d6 = 20;   // DB7(G)  -> IO20 (USB_D+)
+      cfg.pin_d7 = 3;    // DB8(G)  -> IO3
+      cfg.pin_d8 = 46;   // DB9(G)  -> IO46
+      cfg.pin_d9 = 9;    // DB10(G) -> IO9
+      cfg.pin_d10 = 10;  // DB11(R) -> IO10 (SPICS0)
+      cfg.pin_d11 = 11;  // DB13(R) -> IO11 (SPID)  (note: table labels DB13 at IO11)
+      cfg.pin_d12 = 12;  // DB14(R) -> IO12 (SPICLK)
+      cfg.pin_d13 = 13;  // DB15(R) -> IO13 (SPIQ)
+      cfg.pin_d14 = 14;  // DB16(R) -> IO14
+      cfg.pin_d15 = 0;   // DB17(R) -> IO0 (BOOT / DB17)
+      // Control / timing pins
+      cfg.pin_hsync = 16; // HSYNC -> IO16
+      cfg.pin_vsync = 17; // VSYNC -> IO17
+      cfg.pin_de = 18;    // DE    -> IO18
+      cfg.pin_pclk = 21;  // PCLK  -> IO21
+      // Setup params
+      cfg.freq_write = 20000000; // try 20MHz for parallel transfers initially
       cfg.freq_read = 16000000;
-      cfg.pin_sclk = TFT_SCLK_PIN;
-      cfg.pin_mosi = TFT_MOSI_PIN;
-      cfg.pin_miso = TFT_MISO_PIN;
-      cfg.pin_dc = TFT_DC_PIN;
-      cfg.spi_3wire = TFT_MISO_PIN < 0;
+      cfg.i2s_port = 0;
       _bus.config(cfg);
       _panel.setBus(&_bus);
     }
 
+    // Panel configuration
     {
       auto cfg = _panel.config();
       cfg.pin_cs = TFT_CS_PIN;
       cfg.pin_rst = TFT_RST_PIN;
       cfg.pin_busy = -1;
-      cfg.bus_shared = true;
+      cfg.bus_shared = false;
       cfg.panel_width = TFT_WIDTH;
       cfg.panel_height = TFT_HEIGHT;
-      cfg.offset_x = 0;
-      cfg.offset_y = 0;
       cfg.memory_width = TFT_WIDTH;
       cfg.memory_height = TFT_HEIGHT;
       cfg.readable = false;
       cfg.invert = false;
-      cfg.rgb_order = false;
-      cfg.dlen_16bit = false;
-      cfg.bus_shared = true;
+      cfg.rgb_order = false; // try false; swap to true if colors appear swapped
+      cfg.dlen_16bit = true; // using 16-bit parallel
       _panel.config(cfg);
-      _panel.setRotation(1);
     }
 
+    // Backlight (PWM) — we also force BL on in setup() to ensure power during debug
     {
       auto cfg = _light.config();
       cfg.pin_bl = TFT_BL_PIN;
-      cfg.invert = false;
       cfg.freq = TFT_BL_FREQ;
-      cfg.pwm_channel = TFT_BL_PWM_CHANNEL;
+      cfg.channel = TFT_BL_PWM_CHANNEL;
+      cfg.invert = false; // try false first; set true if BL is inverted
       _light.config(cfg);
       _panel.setLight(&_light);
     }
-
-    setPanel(&_panel);
   }
 };
+
+
 
 LGFX display;
 Adafruit_FT6206 touchController;
