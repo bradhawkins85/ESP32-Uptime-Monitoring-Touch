@@ -25,11 +25,11 @@
 #endif
 
 #ifndef TFT_SCLK_PIN
-#define TFT_SCLK_PIN 12
+#define TFT_SCLK_PIN 48  // SPI clock for ST7701 initialization on ESP32-4848S040
 #endif
 
 #ifndef TFT_MOSI_PIN
-#define TFT_MOSI_PIN 11
+#define TFT_MOSI_PIN 47  // SPI data for ST7701 initialization on ESP32-4848S040
 #endif
 
 #ifndef TFT_MISO_PIN
@@ -49,15 +49,7 @@
 #endif
 
 #ifndef TFT_BL_PIN
-#define TFT_BL_PIN 2    // Backlight control pin for ESP32-4848S040
-#endif
-
-#ifndef TFT_BL_FREQ
-#define TFT_BL_FREQ 44100
-#endif
-
-#ifndef TFT_BL_PWM_CHANNEL
-#define TFT_BL_PWM_CHANNEL 7
+#define TFT_BL_PIN 38   // Backlight control pin for ESP32-4848S040
 #endif
 
 #ifndef TOUCH_SDA_PIN
@@ -98,7 +90,7 @@ AsyncWebServer server(80);
 // the d0..d15 pins below by +/-1 accordingly.
 class LGFX : public lgfx::LGFX_Device {
   lgfx::Bus_RGB _bus_instance;
-  lgfx::Panel_ST7701 _panel_instance;
+  lgfx::Panel_ST7701_guition_esp32_4848S040 _panel_instance;
   lgfx::Light_PWM _light_instance;
   lgfx::Touch_GT911 _touch_instance;
 
@@ -173,16 +165,13 @@ class LGFX : public lgfx::LGFX_Device {
     }
     _panel_instance.setBus(&_bus_instance);
 
-    // Backlight (PWM) — we also force BL on in setup() to ensure power during debug
+    // Backlight (PWM)
     {
       auto cfg = _light_instance.config();
       cfg.pin_bl = TFT_BL_PIN;
-      cfg.freq = TFT_BL_FREQ;
-      cfg.pwm_channel = TFT_BL_PWM_CHANNEL;
-      cfg.invert = false; // try false first; set true if BL is inverted
       _light_instance.config(cfg);
-      _panel_instance.setLight(&_light_instance);
     }
+    _panel_instance.light(&_light_instance);
 
     // GT911 Touch controller configuration
     {
