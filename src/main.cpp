@@ -8,7 +8,10 @@
 #include <HTTPClient.h>
 #include <ESP32Ping.h>
 #include <mbedtls/base64.h>
+#define LGFX_USE_V1
 #include <LovyanGFX.hpp>
+#include <lgfx/v1/platforms/esp32s3/Panel_RGB.hpp>
+#include <lgfx/v1/platforms/esp32s3/Bus_RGB.hpp>
 #include <Adafruit_FT6206.h>
 #include <Wire.h>
 
@@ -96,74 +99,92 @@ AsyncWebServer server(80);
 // NOTE: This is a best-effort mapping. If your DB numbering is offset (DB0 vs DB1), adjust
 // the d0..d15 pins below by +/-1 accordingly.
 class LGFX : public lgfx::LGFX_Device {
-  lgfx::Panel_ST7701 _panel;        // ST7701 panel
-  lgfx::Bus_Parallel16 _bus;        // 16-bit parallel bus
-  lgfx::Light_PWM _light;
+  lgfx::Bus_RGB _bus_instance;
+  lgfx::Panel_ST7701 _panel_instance;
+  lgfx::Light_PWM _light_instance;
 
  public:
   LGFX() {
-    // Parallel bus configuration
-    {
-      auto cfg = _bus.config();
-      // Data pins d0..d15 mapped from the table you supplied (DB1..DB17).
-      // If the module uses DB0..DB15 instead, shift the mapping by one.
-      cfg.pin_d0 = 4;    // DB1(B)  -> IO4
-      cfg.pin_d1 = 5;    // DB2(B)  -> IO5
-      cfg.pin_d2 = 6;    // DB3(B)  -> IO6
-      cfg.pin_d3 = 7;    // DB4(B)  -> IO7
-      cfg.pin_d4 = 15;   // DB5(B)  -> IO15
-      cfg.pin_d5 = 8;    // DB6(G)  -> IO8
-      cfg.pin_d6 = 20;   // DB7(G)  -> IO20 (USB_D+)
-      cfg.pin_d7 = 3;    // DB8(G)  -> IO3
-      cfg.pin_d8 = 46;   // DB9(G)  -> IO46
-      cfg.pin_d9 = 9;    // DB10(G) -> IO9
-      cfg.pin_d10 = 10;  // DB11(R) -> IO10 (SPICS0)
-      cfg.pin_d11 = 11;  // DB13(R) -> IO11 (SPID)  (note: table labels DB13 at IO11)
-      cfg.pin_d12 = 12;  // DB14(R) -> IO12 (SPICLK)
-      cfg.pin_d13 = 13;  // DB15(R) -> IO13 (SPIQ)
-      cfg.pin_d14 = 14;  // DB16(R) -> IO14
-      cfg.pin_d15 = 0;   // DB17(R) -> IO0 (BOOT / DB17)
-      // Control / timing pins
-      cfg.pin_hsync = 16; // HSYNC -> IO16
-      cfg.pin_vsync = 17; // VSYNC -> IO17
-      cfg.pin_de = 18;    // DE    -> IO18
-      cfg.pin_pclk = 21;  // PCLK  -> IO21
-      // Setup params
-      cfg.freq_write = 20000000; // try 20MHz for parallel transfers initially
-      cfg.freq_read = 16000000;
-      cfg.i2s_port = 0;
-      _bus.config(cfg);
-      _panel.setBus(&_bus);
-    }
-
     // Panel configuration
     {
-      auto cfg = _panel.config();
-      cfg.pin_cs = TFT_CS_PIN;
-      cfg.pin_rst = TFT_RST_PIN;
-      cfg.pin_busy = -1;
-      cfg.bus_shared = false;
-      cfg.panel_width = TFT_WIDTH;
-      cfg.panel_height = TFT_HEIGHT;
-      cfg.memory_width = TFT_WIDTH;
+      auto cfg = _panel_instance.config();
+      cfg.memory_width  = TFT_WIDTH;
       cfg.memory_height = TFT_HEIGHT;
-      cfg.readable = false;
-      cfg.invert = false;
-      cfg.rgb_order = false; // try false; swap to true if colors appear swapped
-      cfg.dlen_16bit = true; // using 16-bit parallel
-      _panel.config(cfg);
+      cfg.panel_width   = TFT_WIDTH;
+      cfg.panel_height  = TFT_HEIGHT;
+      cfg.offset_x = 0;
+      cfg.offset_y = 0;
+      _panel_instance.config(cfg);
     }
+
+    // Panel detail configuration (SPI pins for ST7701 initialization)
+    {
+      auto cfg = _panel_instance.config_detail();
+      cfg.pin_cs   = TFT_CS_PIN;
+      cfg.pin_sclk = TFT_SCLK_PIN;
+      cfg.pin_mosi = TFT_MOSI_PIN;
+      _panel_instance.config_detail(cfg);
+    }
+
+    // RGB Bus configuration
+    {
+      auto cfg = _bus_instance.config();
+      cfg.panel = &_panel_instance;
+      // Data pins d0..d15 mapped from the table you supplied (DB1..DB17).
+      // If the module uses DB0..DB15 instead, shift the mapping by one.
+      cfg.pin_d0  = GPIO_NUM_4;   // DB1(B)  -> IO4
+      cfg.pin_d1  = GPIO_NUM_5;   // DB2(B)  -> IO5
+      cfg.pin_d2  = GPIO_NUM_6;   // DB3(B)  -> IO6
+      cfg.pin_d3  = GPIO_NUM_7;   // DB4(B)  -> IO7
+      cfg.pin_d4  = GPIO_NUM_15;  // DB5(B)  -> IO15
+      cfg.pin_d5  = GPIO_NUM_8;   // DB6(G)  -> IO8
+      cfg.pin_d6  = GPIO_NUM_20;  // DB7(G)  -> IO20 (USB_D+)
+      cfg.pin_d7  = GPIO_NUM_3;   // DB8(G)  -> IO3
+      cfg.pin_d8  = GPIO_NUM_46;  // DB9(G)  -> IO46
+      cfg.pin_d9  = GPIO_NUM_9;   // DB10(G) -> IO9
+      cfg.pin_d10 = GPIO_NUM_10;  // DB11(R) -> IO10 (SPICS0)
+      cfg.pin_d11 = GPIO_NUM_11;  // DB13(R) -> IO11 (SPID)  (note: table labels DB13 at IO11)
+      cfg.pin_d12 = GPIO_NUM_12;  // DB14(R) -> IO12 (SPICLK)
+      cfg.pin_d13 = GPIO_NUM_13;  // DB15(R) -> IO13 (SPIQ)
+      cfg.pin_d14 = GPIO_NUM_14;  // DB16(R) -> IO14
+      cfg.pin_d15 = GPIO_NUM_0;   // DB17(R) -> IO0 (BOOT / DB17)
+
+      // Control / timing pins
+      cfg.pin_henable = GPIO_NUM_18;  // DE    -> IO18
+      cfg.pin_vsync   = GPIO_NUM_17;  // VSYNC -> IO17
+      cfg.pin_hsync   = GPIO_NUM_16;  // HSYNC -> IO16
+      cfg.pin_pclk    = GPIO_NUM_21;  // PCLK  -> IO21
+
+      cfg.freq_write = 14000000; // 14MHz for RGB bus
+
+      // Timing parameters for ST7701
+      cfg.hsync_polarity    = 0;
+      cfg.hsync_front_porch = 10;
+      cfg.hsync_pulse_width = 8;
+      cfg.hsync_back_porch  = 50;
+      cfg.vsync_polarity    = 0;
+      cfg.vsync_front_porch = 10;
+      cfg.vsync_pulse_width = 8;
+      cfg.vsync_back_porch  = 20;
+      cfg.pclk_idle_high    = 0;
+      cfg.de_idle_high      = 1;
+
+      _bus_instance.config(cfg);
+    }
+    _panel_instance.setBus(&_bus_instance);
 
     // Backlight (PWM) — we also force BL on in setup() to ensure power during debug
     {
-      auto cfg = _light.config();
+      auto cfg = _light_instance.config();
       cfg.pin_bl = TFT_BL_PIN;
       cfg.freq = TFT_BL_FREQ;
-      cfg.channel = TFT_BL_PWM_CHANNEL;
+      cfg.pwm_channel = TFT_BL_PWM_CHANNEL;
       cfg.invert = false; // try false first; set true if BL is inverted
-      _light.config(cfg);
-      _panel.setLight(&_light);
+      _light_instance.config(cfg);
+      _panel_instance.setLight(&_light_instance);
     }
+
+    setPanel(&_panel_instance);
   }
 };
 
