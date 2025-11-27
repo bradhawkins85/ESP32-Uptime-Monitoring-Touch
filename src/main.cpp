@@ -81,6 +81,23 @@ bool isDiscordConfigured() {
   return strlen(DISCORD_WEBHOOK_URL) > 0;
 }
 
+bool isWebAuthConfigured() {
+  return strlen(WEB_AUTH_USERNAME) > 0;
+}
+
+bool ensureAuthenticated(AsyncWebServerRequest *request) {
+  if (!isWebAuthConfigured()) {
+    return true;
+  }
+
+  if (request->authenticate(WEB_AUTH_USERNAME, WEB_AUTH_PASSWORD)) {
+    return true;
+  }
+
+  request->requestAuthentication();
+  return false;
+}
+
 bool isSmtpConfigured() {
   return strlen(SMTP_SERVER) > 0 && strlen(SMTP_FROM_ADDRESS) > 0 &&
          strlen(SMTP_TO_ADDRESS) > 0;
@@ -458,6 +475,10 @@ void initWebServer() {
   // add service
   server.on("/api/services", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+      if (!ensureAuthenticated(request)) {
+        return;
+      }
+
       if (serviceCount >= MAX_SERVICES) {
         request->send(400, "application/json", "{\"error\":\"Maximum services reached\"}");
         return;
@@ -526,6 +547,10 @@ void initWebServer() {
 
   // delete service
   server.on("/api/services/*", HTTP_DELETE, [](AsyncWebServerRequest *request) {
+    if (!ensureAuthenticated(request)) {
+      return;
+    }
+
     String path = request->url();
     String serviceId = path.substring(path.lastIndexOf('/') + 1);
 
